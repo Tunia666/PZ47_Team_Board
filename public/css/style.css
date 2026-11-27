@@ -1,19 +1,19 @@
 :root {
   color-scheme: light;
-  --ink: #19304a;
-  --sub: #60758a;
-  --blue: #176bd1;
-  --line: #d9e4f0;
-  --bg: #f2f6fb;
-  --mint: #d9f8ef;
-  --danger: #ae354a;
+  --ink: #4a193d;
+  --sub: #8a6081;
+  --blue: #d117a6;
+  --line: #e8b4ea;
+  --bg: #ffc8ed;
+  --mint: #f3d9f8;
+  --danger: #ff00c3;
 }
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background: linear-gradient(160deg, #e6f2ff 0, #f5f8fc 34%, #f6faf8 100%);
+  background: linear-gradient(160deg, #ff0099 0, #ff9fe6 34%, #ff67ca 100%);
   font-family:
     Inter,
     Segoe UI,
@@ -162,18 +162,18 @@ button:disabled {
 }
 .status[data-kind="error"] {
   background: #fff0f1;
-  color: #9e2b45;
+  color: #702b9e;
 }
 .status[data-kind="success"] {
   background: #e7f8ef;
-  color: #1d7853;
+  color: #781d58;
 }
 .status[data-kind="loading"] {
   background: #fff8df;
   color: #8c6118;
 }
 .stats {
-  color: #527086;
+  color: #86526f;
   font-size: 14px;
   margin-bottom: 15px;
 }
@@ -201,7 +201,7 @@ button:disabled {
 .chip {
   font-size: 11px;
   background: #e3ecf9;
-  color: #325d89;
+  color: #893272;
   border-radius: 99px;
   padding: 5px 8px;
 }
