@@ -6,36 +6,194 @@ const filter = document.querySelector("#filter");
 const search = document.querySelector("#search");
 const submitButton = document.querySelector("#submit-button");
 let tasks = [];
+
 function setStatus(message, kind = "info") {
   status.textContent = message;
   status.dataset.kind = kind;
 }
+
 async function apiRequest(path, options = {}) {
-  // TODO 1: выполните fetch, проверьте response.ok.
-  // Для ответа 204 верните null, иначе прочитайте JSON.
-  // При HTTP-ошибке по возможности возьмите сообщение из поля error.
+  const response = await fetch(path, {
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Ошибка сервера: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      if (errorData && errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch {}
+    throw new Error(errorMessage);
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
 }
+
 function renderTasks() {
-  // TODO 2: примените фильтр статуса + поиск по названию,
-  // затем сформируйте карточки через createElement/textContent.
-  // На каждой карточке разместите кнопки data-action=toggle/delete и data-id.
-  // Выведите количество всех, активных и выполненных задач.
+  const totalCount = tasks.length;
+  const doneCount = tasks.filter((t) => t.done).length;
+  const activeCount = totalCount - doneCount;
+
+  summary.textContent = `Всего: ${totalCount} | Активных: ${activeCount} | Выполненных: ${doneCount}`;
+
+  const filterValue = filter.value;
+  const searchQuery = search.value.trim().toLowerCase();
+
+  const filteredTasks = tasks.filter((task) => {
+    const matchesStatus =
+      filterValue === "all" ||
+      (filterValue === "active" && !task.done) ||
+      (filterValue === "done" && task.done);
+
+    const matchesSearch = task.title.toLowerCase().includes(searchQuery);
+
+    return matchesStatus && matchesSearch;
+  });
+
+  list.innerHTML = "";
+
+  if (filteredTasks.length === 0) {
+    const emptyMessage = document.createElement("div");
+    emptyMessage.className = "empty";
+    emptyMessage.textContent = "Задачи не найдены.";
+    list.append(emptyMessage);
+    return;
+  }
+
+  filteredTasks.forEach((task) => {
+    const card = document.createElement("article");
+    card.className = task.done ? "item done" : "item";
+
+    const titleEl = document.createElement("h3");
+    titleEl.textContent = task.title;
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "meta";
+
+    const categoryChip = document.createElement("span");
+    categoryChip.className = "chip";
+    categoryChip.textContent = task.category;
+
+    const priorityChip = document.createElement("span");
+    priorityChip.className = "chip";
+    priorityChip.textContent = task.priority;
+
+    const statusChip = document.createElement("span");
+    statusChip.className = "chip";
+    statusChip.textContent = task.done ? "Выполнено" : "Активна";
+
+    metaEl.append(categoryChip, priorityChip, statusChip);
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "item-actions";
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = task.done ? "secondary" : "";
+    toggleBtn.dataset.action = "toggle";
+    toggleBtn.dataset.id = task.id;
+    toggleBtn.textContent = task.done ? "Вернуть" : "Выполнено";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "danger";
+    deleteBtn.dataset.action = "delete";
+    deleteBtn.dataset.id = task.id;
+    deleteBtn.textContent = "Удалить";
+
+    actionsEl.append(toggleBtn, deleteBtn);
+    card.append(titleEl, metaEl, actionsEl);
+    list.append(card);
+  });
 }
+
 async function loadTasks() {
-  // TODO 3: GET /api/tasks, заполните tasks и вызовите renderTasks().
-  setStatus("TODO: запросите список задач");
+  try {
+    setStatus("Загрузка списка задач...", "loading");
+    const data = await apiRequest("/api/tasks");
+
+    if (!data || !Array.isArray(data.items)) {
+      throw new Error("Некорректный формат данных от сервера");
+    }
+
+    tasks = data.items;
+    renderTasks();
+    setStatus("Список задач обновлён", "success");
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
 }
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  // TODO 4: POST /api/tasks, body=JSON.stringify({title,category,priority}).
-  // Блокируйте submitButton, обрабатывайте ошибку, после успеха вызовите loadTasks().
+
+  const formData = new FormData(form);
+  const payload = {
+    title: formData.get("title")?.trim(),
+    category: formData.get("category"),
+    priority: formData.get("priority"),
+  };
+
+  submitButton.disabled = true;
+  try {
+    setStatus("Создание задачи...", "loading");
+    await apiRequest("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    form.reset();
+    await loadTasks();
+    setStatus("Задача успешно добавлена", "success");
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    submitButton.disabled = false;
+  }
 });
+
 list.addEventListener("click", async (event) => {
-  // TODO 5: делегирование: closest('button[data-action]'), data-id.
-  // toggle → PATCH /api/tasks/:id с {done: !task.done}.
-  // delete → DELETE /api/tasks/:id. После выполнения обновите список.
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const { action, id } = button.dataset;
+  const task = tasks.find((t) => String(t.id) === String(id));
+  if (!task) return;
+
+  button.disabled = true;
+  try {
+    if (action === "toggle") {
+      setStatus("Обновление статуса...", "loading");
+      await apiRequest(`/api/tasks/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ done: !task.done }),
+      });
+    } else if (action === "delete") {
+      setStatus("Удаление задачи...", "loading");
+      await apiRequest(`/api/tasks/${id}`, {
+        method: "DELETE",
+      });
+    }
+
+    await loadTasks();
+  } catch (error) {
+    setStatus(error.message, "error");
+    button.disabled = false;
+  }
 });
+
 filter.addEventListener("change", renderTasks);
 search.addEventListener("input", renderTasks);
 document.querySelector("#refresh-button").addEventListener("click", loadTasks);
-// TODO 6: начальная загрузка.
+
+loadTasks();
